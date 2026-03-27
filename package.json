@@ -1,0 +1,9 @@
+{
+  "name": "m3-combat",
+  "private": true,
+  "scripts": {
+    "dev": "npx wrangler pages dev frontend/ --kv KV",
+    "deploy": "npx wrangler pages deploy frontend/ --project-name m3-combat",
+    "kv:create": "npx wrangler kv namespace create M3_COMBAT_KV"
+  }
+}
