@@ -1,10 +1,12 @@
-// Terrain painting and drawing tools
+// Terrain painting and drawing tools (with batched undo)
 const Drawing = (() => {
   let currentTerrainType = 'wall';
   let isDrawing = false;
   let freeformPoints = [];
   let freeformColor = '#ffffff';
   let freeformWidth = 3;
+  let terrainBatch = {};  // Collect all terrain changes in one drag
+  let eraseBatch = {};
 
   const TERRAIN_TYPES = ['wall', 'difficult', 'water', 'cover'];
 
@@ -16,7 +18,7 @@ const Drawing = (() => {
   }
 
   function onMouseDown(e) {
-    if (e.button !== 0 || e.altKey) return;
+    if (e.button !== 0 || e.altKey || Canvas.isPanningActive()) return;
     if (App.getRole() !== 'dm') return;
 
     const tool = Toolbar.getActive();
@@ -25,10 +27,12 @@ const Drawing = (() => {
 
     if (tool === 'draw') {
       isDrawing = true;
-      paintTerrain(grid.gx, grid.gy);
+      terrainBatch = {};
+      addToTerrainBatch(grid.gx, grid.gy);
     } else if (tool === 'erase') {
       isDrawing = true;
-      eraseTerrain(grid.gx, grid.gy);
+      eraseBatch = {};
+      addToEraseBatch(grid.gx, grid.gy);
     } else if (tool === 'freeform') {
       isDrawing = true;
       const world = screenToWorld(e.offsetX, e.offsetY, cam);
@@ -43,18 +47,18 @@ const Drawing = (() => {
 
     if (tool === 'draw') {
       const grid = screenToGrid(e.offsetX, e.offsetY, cam);
-      paintTerrain(grid.gx, grid.gy);
+      addToTerrainBatch(grid.gx, grid.gy);
     } else if (tool === 'erase') {
       const grid = screenToGrid(e.offsetX, e.offsetY, cam);
-      eraseTerrain(grid.gx, grid.gy);
+      addToEraseBatch(grid.gx, grid.gy);
     } else if (tool === 'freeform') {
       const world = screenToWorld(e.offsetX, e.offsetY, cam);
       freeformPoints.push([world.wx, world.wy]);
-      // Live preview: temporarily add to state
+      // Live preview
       const state = State.getState();
       const existing = state.grid.drawings.find(d => d.id === '__preview__');
       if (existing) {
-        existing.points = freeformPoints;
+        existing.points = [...freeformPoints];
       } else {
         state.grid.drawings.push({
           id: '__preview__',
@@ -70,8 +74,24 @@ const Drawing = (() => {
     if (!isDrawing) return;
     const tool = Toolbar.getActive();
 
-    if (tool === 'freeform' && freeformPoints.length > 1) {
-      // Remove preview and commit
+    if (tool === 'draw' && Object.keys(terrainBatch).length > 0) {
+      // Commit entire batch as one undo entry
+      const batch = { ...terrainBatch };
+      State.mutate(s => {
+        for (const key in batch) {
+          s.grid.terrain[key] = batch[key];
+        }
+      });
+      terrainBatch = {};
+    } else if (tool === 'erase' && Object.keys(eraseBatch).length > 0) {
+      const batch = { ...eraseBatch };
+      State.mutate(s => {
+        for (const key in batch) {
+          delete s.grid.terrain[key];
+        }
+      });
+      eraseBatch = {};
+    } else if (tool === 'freeform' && freeformPoints.length > 1) {
       State.mutate(s => {
         s.grid.drawings = s.grid.drawings.filter(d => d.id !== '__preview__');
         s.grid.drawings.push({
@@ -83,7 +103,7 @@ const Drawing = (() => {
       });
       freeformPoints = [];
     } else {
-      // Remove any lingering preview
+      // Clean up any preview
       const state = State.getState();
       state.grid.drawings = state.grid.drawings.filter(d => d.id !== '__preview__');
     }
@@ -91,22 +111,20 @@ const Drawing = (() => {
     isDrawing = false;
   }
 
-  function paintTerrain(gx, gy) {
+  function addToTerrainBatch(gx, gy) {
     const key = `${gx},${gy}`;
-    const state = State.getState();
-    if (state.grid.terrain[key] && state.grid.terrain[key].type === currentTerrainType) return;
-    State.mutate(s => {
-      s.grid.terrain[key] = { type: currentTerrainType };
-    });
+    terrainBatch[key] = { type: currentTerrainType };
+    // Immediate visual feedback: paint directly on state (undo handled on mouseUp)
+    State.getState().grid.terrain[key] = { type: currentTerrainType };
   }
 
-  function eraseTerrain(gx, gy) {
+  function addToEraseBatch(gx, gy) {
     const key = `${gx},${gy}`;
     const state = State.getState();
-    if (!state.grid.terrain[key]) return;
-    State.mutate(s => {
-      delete s.grid.terrain[key];
-    });
+    if (state.grid.terrain[key]) {
+      eraseBatch[key] = true;
+      delete state.grid.terrain[key];
+    }
   }
 
   function setTerrainType(type) {
@@ -115,20 +133,15 @@ const Drawing = (() => {
 
   function getTerrainType() { return currentTerrainType; }
   function getTerrainTypes() { return [...TERRAIN_TYPES]; }
-
   function setFreeformColor(color) { freeformColor = color; }
   function setFreeformWidth(width) { freeformWidth = width; }
 
   function clearAllDrawings() {
-    State.mutate(s => {
-      s.grid.drawings = [];
-    });
+    State.mutate(s => { s.grid.drawings = []; });
   }
 
   function clearAllTerrain() {
-    State.mutate(s => {
-      s.grid.terrain = {};
-    });
+    State.mutate(s => { s.grid.terrain = {}; });
   }
 
   return {

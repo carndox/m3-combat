@@ -359,6 +359,17 @@ html, body {
   font-size: 0.8em;
 }
 
+.sync-dirty {
+  color: var(--warning);
+  font-size: 0.9em;
+  animation: pulse-dot 1s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 /* Initiative panel */
 #initiative-panel {
   border-bottom: 1px solid var(--border);
@@ -383,24 +394,45 @@ html, body {
   font-size: 0.85em;
 }
 
+.init-current-turn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(212, 168, 67, 0.1);
+  border-bottom: 1px solid var(--border);
+  font-weight: bold;
+  font-size: 0.9em;
+  color: var(--accent);
+}
+
+.init-indicator-lg {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .init-list {
-  max-height: 200px;
+  max-height: 250px;
   overflow-y: auto;
 }
 
 .init-empty {
-  padding: 0.5rem 0.75rem;
+  padding: 0.75rem;
   color: var(--text-dim);
   font-size: 0.85em;
+  text-align: center;
 }
 
 .init-entry {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.75rem;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
   cursor: pointer;
   transition: background 0.1s;
+  border-left: 3px solid transparent;
 }
 
 .init-entry:hover {
@@ -409,7 +441,7 @@ html, body {
 
 .init-entry.init-active {
   background: rgba(212, 168, 67, 0.15);
-  border-left: 3px solid var(--accent);
+  border-left-color: var(--accent);
 }
 
 .init-entry.init-hidden {
@@ -431,6 +463,22 @@ html, body {
   white-space: nowrap;
 }
 
+.init-input {
+  width: 40px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.15rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.85em;
+  text-align: center;
+}
+
+.init-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .init-value {
   color: var(--text-dim);
   font-size: 0.85em;
@@ -445,6 +493,7 @@ html, body {
   cursor: pointer;
   font-size: 1.1em;
   padding: 0 2px;
+  flex-shrink: 0;
 }
 
 .init-remove:hover {
@@ -454,8 +503,12 @@ html, body {
 .init-controls {
   display: flex;
   gap: 4px;
-  padding: 0.4rem 0.75rem;
+  padding: 0.3rem 0.75rem;
   flex-wrap: wrap;
+}
+
+.init-controls:last-child {
+  padding-bottom: 0.5rem;
 }
 
 /* Stats panel */

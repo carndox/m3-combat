@@ -1,10 +1,16 @@
-// Single-room sync: DM pushes, players poll
+// Single-room sync with auto-push for DM
 const Sync = (() => {
   let dmToken = null;
   let playerTag = null;
   let pollInterval = null;
   let lastVersion = -1;
   let statusEl = null;
+  let pushTimeout = null;
+  let isDirty = false;
+  let isPushing = false;
+  let unsubscribe = null;
+
+  const AUTO_PUSH_DELAY = 1500; // ms after last change before auto-push
 
   function init() {
     statusEl = document.getElementById('sync-status');
@@ -12,19 +18,32 @@ const Sync = (() => {
 
   function setDmToken(token) {
     dmToken = token;
+    // Subscribe to state changes for auto-push
+    if (unsubscribe) unsubscribe();
+    unsubscribe = State.subscribe(() => {
+      if (!dmToken) return; // Only DM auto-pushes
+      isDirty = true;
+      updateDirtyIndicator();
+      schedulePush();
+    });
   }
 
   function joinAsPlayer(tag) {
     playerTag = tag;
   }
 
+  function schedulePush() {
+    if (pushTimeout) clearTimeout(pushTimeout);
+    pushTimeout = setTimeout(() => {
+      push();
+    }, AUTO_PUSH_DELAY);
+  }
+
   async function push() {
-    if (!dmToken) {
-      setStatus('Not authenticated');
-      return;
-    }
+    if (!dmToken || isPushing) return;
+    isPushing = true;
     try {
-      setStatus('Pushing...');
+      setStatus('Syncing...');
       const state = State.getState();
       const res = await fetch('/api/state', {
         method: 'POST',
@@ -36,16 +55,29 @@ const Sync = (() => {
       });
       if (!res.ok) throw new Error('Push failed');
       const data = await res.json();
-      setStatus(`Pushed v${data.version}`);
+      isDirty = false;
+      updateDirtyIndicator();
+      setStatus(`Synced v${data.version}`);
     } catch (e) {
-      setStatus('Push error');
+      setStatus('Sync error');
       console.error(e);
+      // Retry in 3 seconds
+      setTimeout(() => { if (isDirty) push(); }, 3000);
+    } finally {
+      isPushing = false;
+    }
+  }
+
+  function updateDirtyIndicator() {
+    const indicator = document.getElementById('sync-dirty');
+    if (indicator) {
+      indicator.style.display = isDirty ? 'inline-block' : 'none';
     }
   }
 
   function startPolling() {
     if (pollInterval) clearInterval(pollInterval);
-    poll(); // immediate first poll
+    poll();
     pollInterval = setInterval(poll, 2000);
   }
 
@@ -58,13 +90,11 @@ const Sync = (() => {
 
   async function poll() {
     try {
-      // Check version first
       const vRes = await fetch('/api/version');
       if (!vRes.ok) return;
       const vData = await vRes.json();
       if (vData.version === lastVersion) return;
 
-      // Fetch full state
       const sRes = await fetch(`/api/state?role=player`);
       if (!sRes.ok) return;
       const state = await sRes.json();
@@ -73,7 +103,7 @@ const Sync = (() => {
       State.setState(state);
       setStatus(`Synced v${state.version}`);
     } catch (e) {
-      // Silent fail, will retry
+      // Silent retry
     }
   }
 
@@ -92,9 +122,12 @@ const Sync = (() => {
 
   function disconnect() {
     stopPolling();
+    if (pushTimeout) clearTimeout(pushTimeout);
+    if (unsubscribe) unsubscribe();
     dmToken = null;
     playerTag = null;
     lastVersion = -1;
+    isDirty = false;
     setStatus('Disconnected');
   }
 
@@ -102,13 +135,12 @@ const Sync = (() => {
     if (statusEl) statusEl.textContent = msg;
   }
 
-  function getRoomCode() { return null; }
   function getDmToken() { return dmToken; }
   function getPlayerTag() { return playerTag; }
   function isDM() { return !!dmToken; }
 
   return {
     init, setDmToken, joinAsPlayer, push, startPolling, stopPolling,
-    disconnect, playerMove, getRoomCode, getDmToken, getPlayerTag, isDM
+    disconnect, playerMove, getDmToken, getPlayerTag, isDM
   };
 })();

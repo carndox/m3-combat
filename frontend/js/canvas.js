@@ -4,6 +4,7 @@ const Canvas = (() => {
   let camera = { offsetX: 0, offsetY: 0, zoom: 1 };
   let isPanning = false;
   let panStart = { x: 0, y: 0 };
+  let spaceHeld = false;
   let animFrameId = null;
 
   const MIN_ZOOM = 0.2;
@@ -55,6 +56,23 @@ const Canvas = (() => {
     cvs.addEventListener('mouseup', onMouseUp);
     cvs.addEventListener('mouseleave', onMouseUp);
     cvs.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Space key for pan mode
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.code === 'Space' && !spaceHeld) {
+        spaceHeld = true;
+        cvs.style.cursor = 'grab';
+        e.preventDefault();
+      }
+    });
+    document.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        spaceHeld = false;
+        if (!isPanning) cvs.style.cursor = '';
+      }
+    });
+
     startRenderLoop();
   }
 
@@ -70,14 +88,14 @@ const Canvas = (() => {
     const mouseY = e.offsetY;
     const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
     const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.zoom * zoomFactor));
-    // Zoom toward cursor
     camera.offsetX = mouseX - (mouseX - camera.offsetX) * (newZoom / camera.zoom);
     camera.offsetY = mouseY - (mouseY - camera.offsetY) * (newZoom / camera.zoom);
     camera.zoom = newZoom;
   }
 
   function onMouseDown(e) {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    // Pan: right-click, middle-click, space+left-click, or alt+left-click
+    if (e.button === 2 || e.button === 1 || (e.button === 0 && (spaceHeld || e.altKey))) {
       isPanning = true;
       panStart = { x: e.clientX - camera.offsetX, y: e.clientY - camera.offsetY };
       cvs.style.cursor = 'grabbing';
@@ -93,11 +111,13 @@ const Canvas = (() => {
   }
 
   function onMouseUp(e) {
-    if (isPanning) {
+    if (isPanning && (e.button === 2 || e.button === 1 || e.button === 0)) {
       isPanning = false;
-      cvs.style.cursor = '';
+      cvs.style.cursor = spaceHeld ? 'grab' : '';
     }
   }
+
+  function isPanningActive() { return isPanning || spaceHeld; }
 
   function startRenderLoop() {
     function frame() {
@@ -120,7 +140,7 @@ const Canvas = (() => {
     drawGrid(w, h);
     drawTerrain(state.grid.terrain);
     drawDrawings(state.grid.drawings);
-    drawTokens(state.tokens);
+    drawTokens(state.tokens, state.initiative);
     drawMeasure();
     drawHover();
 
@@ -178,9 +198,11 @@ const Canvas = (() => {
     }
   }
 
-  function drawTokens(tokens) {
+  function drawTokens(tokens, initState) {
     const gs = GRID_SIZE;
     const role = App ? App.getRole() : 'dm';
+    const currentTurnId = initState.order.length > 0
+      ? initState.order[initState.currentIndex] : null;
 
     for (const token of tokens) {
       if (!token.visible && role !== 'dm') continue;
@@ -189,15 +211,12 @@ const Canvas = (() => {
       const px = token.x * gs + (size * gs) / 2;
       const py = token.y * gs + (size * gs) / 2;
       const radius = (size * gs) / 2 - 4;
-
-      // Check if this token has the current initiative turn
-      const initState = State.getState().initiative;
-      const isCurrentTurn = initState.order.length > 0 &&
-        initState.order[initState.currentIndex] === token.id;
+      const isCurrentTurn = token.id === currentTurnId;
+      const isSelected = Tokens.getSelected() === token.id;
 
       // Active turn glow (pulsing golden ring)
       if (isCurrentTurn) {
-        const pulse = (Math.sin(Date.now() / 300) + 1) / 2; // 0 to 1 oscillation
+        const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
         const glowRadius = radius + 6 + pulse * 4;
         ctx.beginPath();
         ctx.arc(px, py, glowRadius, 0, Math.PI * 2);
@@ -212,10 +231,8 @@ const Canvas = (() => {
 
       ctx.fillStyle = token.color || '#e74c3c';
       ctx.fill();
-      ctx.strokeStyle = isCurrentTurn ? '#ffd700' :
-        Tokens.getSelected() === token.id ? '#fff' : 'rgba(0,0,0,0.5)';
-      ctx.lineWidth = isCurrentTurn ? 3 / camera.zoom :
-        Tokens.getSelected() === token.id ? 3 / camera.zoom : 1.5 / camera.zoom;
+      ctx.strokeStyle = isCurrentTurn ? '#ffd700' : isSelected ? '#fff' : 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = (isCurrentTurn || isSelected ? 3 : 1.5) / camera.zoom;
       ctx.stroke();
 
       // Hidden indicator for DM
@@ -239,8 +256,8 @@ const Canvas = (() => {
       ctx.strokeText(token.name, px, labelY);
       ctx.fillText(token.name, px, labelY);
 
-      // HP bar (DM only, or own tokens)
-      if (role === 'dm' || (token.owner && token.owner === App.getPlayerTag())) {
+      // HP bar (DM sees all, players see own + party)
+      if (role === 'dm' || (token.owner && (token.owner === App.getPlayerTag() || isPartyToken(token)))) {
         const barWidth = size * gs - 8;
         const barHeight = 4;
         const barX = token.x * gs + 4;
@@ -264,6 +281,11 @@ const Canvas = (() => {
         ctx.fillText(token.conditions.join(', '), px, condY);
       }
     }
+  }
+
+  function isPartyToken(token) {
+    const tags = ['benwull', 'asgar', 'jack'];
+    return tags.includes(token.owner);
   }
 
   function drawMeasure() {
@@ -318,5 +340,5 @@ const Canvas = (() => {
   function getCanvas() { return cvs; }
   function getCtx() { return ctx; }
 
-  return { init, getCamera, getCanvas, getCtx, resize };
+  return { init, getCamera, getCanvas, getCtx, resize, isPanningActive };
 })();
