@@ -105,12 +105,15 @@ const Toolbar = (() => {
 
     // Right side: undo/redo + sync
     if (isDM) {
+      const isOnline = App.getMode() === 'online';
       html += `
         <div class="toolbar-right">
           <button class="tool-btn" id="btn-undo" title="Undo (Ctrl+Z)">&#8630;</button>
           <button class="tool-btn" id="btn-redo" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
-          <span class="toolbar-divider"></span>
-          <button class="btn btn-primary" id="btn-push" title="Push state to players">Push</button>
+          ${isOnline ? `
+            <span class="toolbar-divider"></span>
+            <button class="btn btn-primary" id="btn-push" title="Push state to players">Push</button>
+          ` : ''}
         </div>
       `;
     }
