@@ -92,11 +92,107 @@ html, body {
   border-radius: 6px;
   font-size: 1rem;
   text-align: center;
-  text-transform: uppercase;
 }
 
 .modal-input::placeholder {
-  text-transform: none;
+  color: var(--text-dim);
+}
+
+/* Login screen */
+.login-modal {
+  max-width: 480px;
+}
+
+.login-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.login-card {
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s, background 0.2s;
+  text-align: center;
+  color: var(--text);
+}
+
+.login-card:hover {
+  transform: translateY(-2px);
+}
+
+.login-dm {
+  grid-column: 1 / -1;
+  border-color: var(--accent);
+  background: rgba(212, 168, 67, 0.05);
+}
+
+.login-dm:hover {
+  background: rgba(212, 168, 67, 0.12);
+  border-color: var(--accent-hover);
+}
+
+.login-player {
+  border-color: var(--player-color, var(--border));
+}
+
+.login-player:hover {
+  border-color: var(--player-color);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.login-icon {
+  font-size: 2rem;
+  margin-bottom: 0.3rem;
+}
+
+.login-name {
+  font-weight: bold;
+  font-size: 1.05rem;
+  margin-bottom: 0.15rem;
+}
+
+.login-hint {
+  font-size: 0.8em;
+  color: var(--text-dim);
+}
+
+.dm-auth {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.dm-auth .modal-input {
+  width: 160px;
+}
+
+.dm-auth.hidden {
+  display: none;
+}
+
+.auth-error {
+  color: var(--danger);
+  font-size: 0.85em;
+  width: 100%;
+  text-align: center;
+}
+
+.auth-error.hidden {
+  display: none;
+}
+
+.login-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+  text-align: center;
 }
 
 /* App layout */

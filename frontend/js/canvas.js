@@ -190,14 +190,32 @@ const Canvas = (() => {
       const py = token.y * gs + (size * gs) / 2;
       const radius = (size * gs) / 2 - 4;
 
+      // Check if this token has the current initiative turn
+      const initState = State.getState().initiative;
+      const isCurrentTurn = initState.order.length > 0 &&
+        initState.order[initState.currentIndex] === token.id;
+
+      // Active turn glow (pulsing golden ring)
+      if (isCurrentTurn) {
+        const pulse = (Math.sin(Date.now() / 300) + 1) / 2; // 0 to 1 oscillation
+        const glowRadius = radius + 6 + pulse * 4;
+        ctx.beginPath();
+        ctx.arc(px, py, glowRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(212, 168, 67, ${0.4 + pulse * 0.5})`;
+        ctx.lineWidth = (3 + pulse * 2) / camera.zoom;
+        ctx.stroke();
+      }
+
       // Draw shape
       const renderer = SHAPE_RENDERERS[token.shape] || SHAPE_RENDERERS.circle;
       renderer(ctx, px, py, radius);
 
       ctx.fillStyle = token.color || '#e74c3c';
       ctx.fill();
-      ctx.strokeStyle = Tokens.getSelected() === token.id ? '#fff' : 'rgba(0,0,0,0.5)';
-      ctx.lineWidth = Tokens.getSelected() === token.id ? 3 / camera.zoom : 1.5 / camera.zoom;
+      ctx.strokeStyle = isCurrentTurn ? '#ffd700' :
+        Tokens.getSelected() === token.id ? '#fff' : 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = isCurrentTurn ? 3 / camera.zoom :
+        Tokens.getSelected() === token.id ? 3 / camera.zoom : 1.5 / camera.zoom;
       ctx.stroke();
 
       // Hidden indicator for DM
